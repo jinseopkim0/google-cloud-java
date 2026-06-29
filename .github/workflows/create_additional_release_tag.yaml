@@ -14,14 +14,10 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.CLOUD_JAVA_BOT_GITHUB_TOKEN }}
     - name: Set up Git
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-    - name: Fetch all tags
-      run: git fetch --tags
     - name: Create additional tags
       shell: bash
       run: |
@@ -29,10 +25,10 @@ jobs:
         for ARTIFACT_ID in "${ARTIFACT_IDS[@]}"; do
           VERSION=$(grep "^${ARTIFACT_ID}:" versions.txt | cut -d':' -f2 | tr -d '[:space:]')
           TAG_NAME="${ARTIFACT_ID}/v$VERSION"
-          if git show-ref --tags | grep -q "refs/tags/$TAG_NAME"; then
-            echo "Tag $TAG_NAME already exists. Skipping."
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+            echo "Tag $TAG_NAME already exists on remote. Skipping."
             continue
           fi
-          git tag $TAG_NAME
+          git tag -f $TAG_NAME
           git push origin $TAG_NAME
         done
