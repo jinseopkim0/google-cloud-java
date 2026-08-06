@@ -26,9 +26,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
@@ -68,8 +67,9 @@ public class ITArrowVsJsonBenchmarkTest {
     // 2. Prepare Synthetic Data in JSON Format (List<TableRow>)
     List<TableRow> jsonRows = createJsonRows(NUM_ROWS);
 
-    // 3. Prepare Synthetic Data in Arrow Format (byte[])
-    byte[] arrowBatchBytes = createArrowBatchBytes(NUM_ROWS);
+    // 3. Prepare Synthetic Data in Base64-Encoded Arrow String Format (matches REST jobs.query Page 1 payload)
+    byte[] rawArrowBytes = createArrowBatchBytes(NUM_ROWS);
+    String base64ArrowString = Base64.getEncoder().encodeToString(rawArrowBytes);
 
     // -------------------------------------------------------------------------
     // BENCHMARK 1: JSON Parsing (TableRow -> FieldValueList)
@@ -89,18 +89,20 @@ public class ITArrowVsJsonBenchmarkTest {
     System.out.println("Approx Heap Used: " + Math.max(0, memoryUsedJsonMb) + " MB");
 
     // -------------------------------------------------------------------------
-    // BENCHMARK 2: Arrow Vector Decoding (Arrow byte[] -> FieldValueList)
+    // BENCHMARK 2: Base64 Decoding + Arrow Vector Decoding (Base64 String -> byte[] -> FieldValueList)
     // -------------------------------------------------------------------------
     System.gc();
     long startMemoryArrow = getUsedMemory();
     long startTimeArrow = System.nanoTime();
 
-    List<FieldValueList> arrowResultRows = parseArrowBytes(arrowBatchBytes, schema);
+    // Includes explicit Base64 decoding step as requested by reviewer
+    byte[] decodedArrowBytes = Base64.getDecoder().decode(base64ArrowString);
+    List<FieldValueList> arrowResultRows = parseArrowBytes(decodedArrowBytes, schema);
 
     long elapsedArrowMs = (System.nanoTime() - startTimeArrow) / 1_000_000;
     long memoryUsedArrowMb = (getUsedMemory() - startMemoryArrow) / (1024 * 1024);
 
-    System.out.println("\n--- [Arrow Vector Decoding Results] ---");
+    System.out.println("\n--- [Base64 + Arrow Vector Decoding Results] ---");
     System.out.println("Time Taken      : " + elapsedArrowMs + " ms");
     System.out.println("Rows Converted  : " + arrowResultRows.size());
     System.out.println("Approx Heap Used: " + Math.max(0, memoryUsedArrowMb) + " MB");
